@@ -1,5 +1,4 @@
 /velour
-/hostarr
 *.db
 *.db-shm
 *.db-wal
