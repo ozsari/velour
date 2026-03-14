@@ -90,6 +90,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: velour_*
 
       - name: Create release
         uses: softprops/action-gh-release@v2
