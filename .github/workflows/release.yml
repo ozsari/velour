@@ -34,9 +34,6 @@ jobs:
           cd web/frontend
           npm ci --legacy-peer-deps
           npm run build
-          cd ../..
-          mkdir -p web/dist
-          cp -r web/frontend/dist/* web/dist/ 2>/dev/null || cp -r web/frontend/dist web/
 
       - name: Build binary
         env:
