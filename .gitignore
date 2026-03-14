@@ -1,0 +1,13 @@
+/velour
+/hostarr
+*.db
+*.db-shm
+*.db-wal
+*.exe
+*.pid
+web/dist/
+web/frontend/node_modules/
+.env
+.DS_Store
+.data/
+.claude/

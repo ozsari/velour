@@ -1,0 +1,18 @@
+services:
+  velour:
+    build: .
+    image: ghcr.io/ozsari/velour:latest
+    container_name: velour
+    restart: unless-stopped
+    ports:
+      - "8585:8585"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - velour_data:/opt/velour
+    environment:
+      - VELOUR_HOST=0.0.0.0
+      - VELOUR_PORT=8585
+      - VELOUR_DATA_DIR=/opt/velour
+
+volumes:
+  velour_data:

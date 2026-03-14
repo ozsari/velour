@@ -1,0 +1,7 @@
+node_modules
+web/frontend/node_modules
+web/dist
+*.db
+.git
+.env
+velour
