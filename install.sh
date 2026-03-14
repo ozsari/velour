@@ -149,8 +149,8 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-# systemctl enable velour
-# systemctl start velour
+systemctl enable velour
+systemctl start velour
 
 echo ""
 echo -e "${GREEN}${BOLD}Velour installed successfully!${NC}"
