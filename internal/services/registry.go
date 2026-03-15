@@ -40,46 +40,9 @@ WantedBy=multi-user.target`,
 			AptPackages: []string{"deluged", "deluge-web"},
 			ConfigDir: "${DATA_DIR}/deluge", User: "deluge",
 			PostInstallCmds: []string{
-				// Auth file for deluged daemon RPC (deluge-web connects to deluged with these)
+				// Auth file for deluged daemon RPC
 				`echo "${VELOUR_USER}:${VELOUR_PASS}:10" > /opt/velour/deluge/auth && chown deluge:deluge /opt/velour/deluge/auth`,
-				// Set deluge-web UI password in web.conf — Deluge 2.x uses two-JSON-objects format
-				`python3 -c "
-import hashlib, json, os, stat
-salt = os.urandom(32).hex()
-pwd_hash = hashlib.sha1((salt + '${VELOUR_PASS}').encode('utf-8')).hexdigest()
-conf_path = '/opt/velour/deluge/web.conf'
-header = {'file': 3, 'format': 1}
-body = {
-    'base': '/',
-    'cert': 'ssl/daemon.cert',
-    'default_daemon': '',
-    'enabled_plugins': [],
-    'first_login': False,
-    'https': False,
-    'interface': '0.0.0.0',
-    'key': 'ssl/daemon.pkey',
-    'language': '',
-    'pkey': 'ssl/daemon.pkey',
-    'port': 8112,
-    'pwd_salt': salt,
-    'pwd_sha1': pwd_hash,
-    'session_timeout': 3600,
-    'show_session_speed': False,
-    'show_sidebar': True,
-    'sidebar_multiple_filters': True,
-    'sidebar_show_zero': False,
-    'theme': 'gray'
-}
-with open(conf_path, 'w') as f:
-    json.dump(header, f, indent=2)
-    f.write('\n')
-    json.dump(body, f, indent=2)
-import pwd, grp
-uid = pwd.getpwnam('deluge').pw_uid
-gid = grp.getgrnam('deluge').gr_gid
-os.chown(conf_path, uid, gid)
-"`,
-				// Create and enable deluge-web systemd service
+				// Create deluge-web systemd service
 				`cat > /etc/systemd/system/deluge-web.service << 'UNIT'
 [Unit]
 Description=Deluge Web Interface
@@ -95,7 +58,39 @@ Restart=on-failure
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload && systemctl enable deluge-web`,
-				// Start deluge-web after a short delay (deluged will be restarted by the main flow)
+				// Start deluged+deluge-web briefly so deluge-web creates its own default web.conf
+				`systemctl start deluged && sleep 2 && systemctl start deluge-web && sleep 4 && systemctl stop deluge-web && systemctl stop deluged`,
+				// Now modify the existing web.conf that deluge-web created (proper Deluge 2.x format)
+				`python3 -c "
+import hashlib, json, os
+password = '${VELOUR_PASS}'
+conf_path = '/opt/velour/deluge/web.conf'
+salt = os.urandom(32).hex()
+s = hashlib.sha1()
+s.update(salt.encode('utf-8'))
+s.update(password.encode('utf-8'))
+pwd_hash = s.hexdigest()
+# Parse Deluge 2.x two-JSON-objects format
+with open(conf_path) as f:
+    content = f.read()
+decoder = json.JSONDecoder()
+content = content.strip()
+header, idx = decoder.raw_decode(content)
+remaining = content[idx:].strip()
+body, _ = decoder.raw_decode(remaining)
+body['pwd_salt'] = salt
+body['pwd_sha1'] = pwd_hash
+body['first_login'] = False
+with open(conf_path, 'w') as f:
+    json.dump(header, f, indent=4, sort_keys=True, ensure_ascii=True)
+    f.write('\n')
+    json.dump(body, f, indent=4, sort_keys=True, ensure_ascii=True)
+import pwd as pw, grp
+uid = pw.getpwnam('deluge').pw_uid
+gid = grp.getgrnam('deluge').gr_gid
+os.chown(conf_path, uid, gid)
+"`,
+				// Restart deluge-web with patched config (deluged will be started by main flow)
 				`(sleep 3 && systemctl start deluge-web) &`,
 			},
 			ServiceUnit: `[Unit]
