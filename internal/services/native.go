@@ -358,13 +358,18 @@ func (nm *NativeManager) runPostInstallCmds(ctx context.Context, native *models.
 	// Stop service before patching config
 	nm.systemctl(ctx, "stop", native.ServiceName)
 
-	for _, cmdStr := range native.PostInstallCmds {
-		// Expand credential placeholders
-		cmdStr = strings.ReplaceAll(cmdStr, "${VELOUR_USER}", nm.appUsername)
-		cmdStr = strings.ReplaceAll(cmdStr, "${VELOUR_PASS}", nm.appPassword)
+	for i, cmdStr := range native.PostInstallCmds {
 		cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			log.Printf("post-install cmd failed: %s: %s: %v", cmdStr, string(out), err)
+		// Pass credentials as env vars instead of string replacement (avoids quoting issues)
+		cmd.Env = append(os.Environ(),
+			"VELOUR_USER="+nm.appUsername,
+			"VELOUR_PASS="+nm.appPassword,
+		)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("post-install cmd [%d] failed: %s\noutput: %s\nerror: %v", i, cmdStr, string(out), err)
+		} else {
+			log.Printf("post-install cmd [%d] ok: %s", i, cmdStr[:min(len(cmdStr), 80)])
 		}
 	}
 

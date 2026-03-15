@@ -41,7 +41,7 @@ WantedBy=multi-user.target`,
 			ConfigDir: "${DATA_DIR}/deluge", User: "deluge",
 			PostInstallCmds: []string{
 				// Auth file for deluged daemon RPC
-				`echo "${VELOUR_USER}:${VELOUR_PASS}:10" > /opt/velour/deluge/auth && chown deluge:deluge /opt/velour/deluge/auth`,
+				`echo "$VELOUR_USER:$VELOUR_PASS:10" > /opt/velour/deluge/auth && chown deluge:deluge /opt/velour/deluge/auth`,
 				// Create deluge-web systemd service
 				`cat > /etc/systemd/system/deluge-web.service << 'UNIT'
 [Unit]
@@ -60,19 +60,20 @@ UNIT
 systemctl daemon-reload && systemctl enable deluge-web`,
 				// Start deluged+deluge-web briefly so deluge-web generates default web.conf
 				`systemctl start deluged && sleep 2 && systemctl start deluge-web && sleep 5 && systemctl stop deluge-web && systemctl stop deluged`,
-				// Set web UI password using Deluge's exact hashing method (all in python3, no bash variable issues)
-				`python3 << 'PYEOF'
+				// Set web UI password using Deluge's exact hashing method — reads password from env var
+				`python3 -c "
 import hashlib, os, subprocess
-password = """${VELOUR_PASS}"""
+password = os.environ['VELOUR_PASS']
 salt = hashlib.sha1(os.urandom(32)).hexdigest()
-s = hashlib.sha1(salt.encode("utf-8"))
-s.update(password.encode("utf-8"))
+s = hashlib.sha1(salt.encode('utf-8'))
+s.update(password.encode('utf-8'))
 pwd_hash = s.hexdigest()
-conf = "/opt/velour/deluge/web.conf"
-subprocess.run(["sed", "-i", f's|"pwd_salt": "[^"]*"|"pwd_salt": "{salt}"|', conf])
-subprocess.run(["sed", "-i", f's|"pwd_sha1": "[^"]*"|"pwd_sha1": "{pwd_hash}"|', conf])
-subprocess.run(["sed", "-i", 's|"first_login": true|"first_login": false|', conf])
-PYEOF`,
+conf = '/opt/velour/deluge/web.conf'
+subprocess.run(['sed', '-i', 's|\"pwd_salt\": \"[^\"]*\"|\"pwd_salt\": \"' + salt + '\"|', conf])
+subprocess.run(['sed', '-i', 's|\"pwd_sha1\": \"[^\"]*\"|\"pwd_sha1\": \"' + pwd_hash + '\"|', conf])
+subprocess.run(['sed', '-i', 's|\"first_login\": true|\"first_login\": false|', conf])
+print(f'Deluge password set: salt={salt[:8]}... hash={pwd_hash[:8]}...')
+"`,
 				// Restart deluge-web with patched config (deluged will be started by main flow)
 				`(sleep 2 && systemctl start deluge-web) &`,
 			},
@@ -127,7 +128,7 @@ WantedBy=multi-user.target`,
 			User: "qbittorrent",
 			PostInstallCmds: []string{
 				// Start qBittorrent, login with default creds, set new creds via API
-				`systemctl start qbittorrent-nox && sleep 3 && SID=$(curl -s -c - 'http://localhost:8085/api/v2/auth/login' -d 'username=admin&password=adminadmin' | grep -oP 'SID\s+\K\S+') && curl -s -b "SID=$SID" 'http://localhost:8085/api/v2/app/setPreferences' -d 'json={"web_ui_username":"${VELOUR_USER}","web_ui_password":"${VELOUR_PASS}"}'; true`,
+				`systemctl start qbittorrent-nox && sleep 3 && SID=$(curl -s -c - 'http://localhost:8085/api/v2/auth/login' -d 'username=admin&password=adminadmin' | grep -oP 'SID\s+\K\S+') && curl -s -b "SID=$SID" 'http://localhost:8085/api/v2/app/setPreferences' -d 'json={"web_ui_username":"$VELOUR_USER","web_ui_password":"$VELOUR_PASS"}'; true`,
 			},
 			ServiceUnit: `[Unit]
 Description=qBittorrent-nox
@@ -217,8 +218,8 @@ WantedBy=multi-user.target`,
 			PostInstallCmds: []string{
 				`sed -i 's/"rpc-whitelist-enabled":.*/"rpc-whitelist-enabled": false,/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
 				`sed -i 's/"rpc-authentication-required":.*/"rpc-authentication-required": true,/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
-				`sed -i 's/"rpc-username":.*/"rpc-username": "${VELOUR_USER}",/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
-				`sed -i 's/"rpc-password":.*/"rpc-password": "${VELOUR_PASS}",/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`sed -i 's/"rpc-username":.*/"rpc-username": "$VELOUR_USER",/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`sed -i 's/"rpc-password":.*/"rpc-password": "$VELOUR_PASS",/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
 			},
 		}},
 	{ID: "nzbget", Name: "NZBGet", Description: "Efficient usenet downloader written in C++ for maximum performance.", Icon: "nzbget", Category: "client", Image: "lscr.io/linuxserver/nzbget:latest",
@@ -251,8 +252,8 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target`,
 			PostInstallCmds: []string{
-				`sed -i 's/^ControlUsername=.*/ControlUsername=${VELOUR_USER}/' /opt/velour/nzbget/nzbget.conf 2>/dev/null; true`,
-				`sed -i 's/^ControlPassword=.*/ControlPassword=${VELOUR_PASS}/' /opt/velour/nzbget/nzbget.conf 2>/dev/null; true`,
+				`sed -i 's/^ControlUsername=.*/ControlUsername=$VELOUR_USER/' /opt/velour/nzbget/nzbget.conf 2>/dev/null; true`,
+				`sed -i 's/^ControlPassword=.*/ControlPassword=$VELOUR_PASS/' /opt/velour/nzbget/nzbget.conf 2>/dev/null; true`,
 			},
 		}},
 	{ID: "sabnzbd", Name: "SABnzbd", Description: "Free, open-source usenet downloader with web-based interface.", Icon: "sabnzbd", Category: "client", Image: "lscr.io/linuxserver/sabnzbd:latest",
@@ -1170,8 +1171,8 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target`,
 			PostInstallCmds: []string{
-				`filebrowser users update admin -p "${VELOUR_PASS}" -d /opt/velour/filebrowser/filebrowser.db 2>/dev/null; true`,
-				`filebrowser users update admin --username "${VELOUR_USER}" -d /opt/velour/filebrowser/filebrowser.db 2>/dev/null; true`,
+				`filebrowser users update admin -p "$VELOUR_PASS" -d /opt/velour/filebrowser/filebrowser.db 2>/dev/null; true`,
+				`filebrowser users update admin --username "$VELOUR_USER" -d /opt/velour/filebrowser/filebrowser.db 2>/dev/null; true`,
 			},
 		}},
 
