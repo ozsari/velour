@@ -110,6 +110,10 @@ func (nm *NativeManager) installApt(ctx context.Context, native *models.NativeCo
 		}
 	}
 
+	// Fix any interrupted dpkg state before installing
+	fix := exec.CommandContext(ctx, "dpkg", "--configure", "-a")
+	fix.Run() // ignore error, best-effort
+
 	// Install packages
 	for _, pkg := range native.AptPackages {
 		if err := nm.aptInstall(ctx, pkg); err != nil {
