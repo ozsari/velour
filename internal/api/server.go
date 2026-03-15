@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/ozsari/velour/internal/config"
 	"github.com/ozsari/velour/internal/monitor"
 	"github.com/ozsari/velour/internal/services"
+	"github.com/ozsari/velour/web"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -130,8 +132,12 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/automation/rules/{id}/toggle", s.authMiddleware(s.handleToggleRule))
 	mux.HandleFunc("GET /api/automation/templates", s.authMiddleware(s.handleListTemplates))
 
-	// Serve frontend
-	mux.Handle("/", http.FileServer(http.Dir("web/dist")))
+	// Serve embedded frontend
+	distFS, err := fs.Sub(web.DistFS, "dist")
+	if err != nil {
+		log.Fatalf("Failed to load embedded frontend: %v", err)
+	}
+	mux.Handle("/", http.FileServer(http.FS(distFS)))
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
