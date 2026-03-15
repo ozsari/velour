@@ -492,7 +492,7 @@ func (nm *NativeManager) addAptRepo(ctx context.Context, repo *models.AptRepo) e
 	// Download and add GPG key
 	if repo.KeyURL != "" {
 		cmd := exec.CommandContext(ctx, "bash", "-c",
-			fmt.Sprintf("curl -fsSL '%s' | gpg --dearmor -o /usr/share/keyrings/velour-%s.gpg",
+			fmt.Sprintf("curl -fsSL '%s' | gpg --batch --yes --dearmor -o /usr/share/keyrings/velour-%s.gpg",
 				repo.KeyURL, strings.ReplaceAll(filepath.Base(repo.KeyURL), ".", "-")))
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to add key: %s: %w", string(out), err)
