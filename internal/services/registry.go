@@ -40,7 +40,7 @@ WantedBy=multi-user.target`,
 			AptPackages: []string{"deluged", "deluge-web"},
 			ConfigDir: "${DATA_DIR}/deluge", User: "deluge",
 			PostInstallCmds: []string{
-				// Create and start deluge-web service
+				// Create deluge-web service
 				`cat > /etc/systemd/system/deluge-web.service << 'UNIT'
 [Unit]
 Description=Deluge Web Interface
@@ -55,7 +55,28 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 UNIT
-systemctl daemon-reload && systemctl enable --now deluge-web`,
+systemctl daemon-reload && systemctl enable deluge-web`,
+				// Start both briefly so deluge-web creates default web.conf
+				`systemctl start deluged && sleep 2 && systemctl start deluge-web && sleep 5 && systemctl stop deluge-web && systemctl stop deluged`,
+				// Set web UI password from env var
+				`python3 -c "
+import hashlib, os, subprocess
+password = os.environ.get('VELOUR_PASS', '')
+if password:
+    salt = hashlib.sha1(os.urandom(32)).hexdigest()
+    s = hashlib.sha1(salt.encode('utf-8'))
+    s.update(password.encode('utf-8'))
+    pwd_hash = s.hexdigest()
+    conf = '/opt/velour/deluge/web.conf'
+    subprocess.run(['sed', '-i', 's|\"pwd_salt\": \"[^\"]*\"|\"pwd_salt\": \"' + salt + '\"|', conf])
+    subprocess.run(['sed', '-i', 's|\"pwd_sha1\": \"[^\"]*\"|\"pwd_sha1\": \"' + pwd_hash + '\"|', conf])
+    subprocess.run(['sed', '-i', 's|\"first_login\": true|\"first_login\": false|', conf])
+    print('OK: password set')
+else:
+    print('SKIP: no VELOUR_PASS')
+"`,
+				// Start deluge-web with patched config
+				`systemctl start deluge-web`,
 			},
 			ServiceUnit: `[Unit]
 Description=Deluge Bittorrent Client Daemon
