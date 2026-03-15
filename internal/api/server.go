@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -132,12 +133,29 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/automation/rules/{id}/toggle", s.authMiddleware(s.handleToggleRule))
 	mux.HandleFunc("GET /api/automation/templates", s.authMiddleware(s.handleListTemplates))
 
-	// Serve embedded frontend
+	// Serve embedded frontend with SPA fallback
 	distFS, err := fs.Sub(web.DistFS, "dist")
 	if err != nil {
 		log.Fatalf("Failed to load embedded frontend: %v", err)
 	}
-	mux.Handle("/", http.FileServer(http.FS(distFS)))
+	fileServer := http.FileServer(http.FS(distFS))
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Try to serve the file directly
+		f, err := distFS.Open(r.URL.Path[1:]) // strip leading /
+		if err != nil {
+			// File not found — serve index.html for SPA routing
+			indexFile, _ := distFS.Open("index.html")
+			if indexFile != nil {
+				defer indexFile.Close()
+				stat, _ := indexFile.Stat()
+				http.ServeContent(w, r, "index.html", stat.ModTime(), indexFile.(io.ReadSeeker))
+				return
+			}
+		} else {
+			f.Close()
+		}
+		fileServer.ServeHTTP(w, r)
+	}))
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
