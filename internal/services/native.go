@@ -499,9 +499,16 @@ func (nm *NativeManager) addAptRepo(ctx context.Context, repo *models.AptRepo) e
 		}
 	}
 
-	// Add repo
-	repoFile := fmt.Sprintf("/etc/apt/sources.list.d/velour-%s.list",
-		strings.Fields(repo.RepoLine)[1]) // use domain as filename hint
+	// Add repo — extract domain from repo line for filename
+	repoName := "repo"
+	for _, field := range strings.Fields(repo.RepoLine) {
+		if strings.HasPrefix(field, "http") {
+			repoName = strings.ReplaceAll(strings.ReplaceAll(
+				strings.Split(field, "/")[2], ".", "-"), ":", "")
+			break
+		}
+	}
+	repoFile := fmt.Sprintf("/etc/apt/sources.list.d/velour-%s.list", repoName)
 	if err := os.WriteFile(repoFile, []byte(repo.RepoLine+"\n"), 0644); err != nil {
 		return err
 	}
