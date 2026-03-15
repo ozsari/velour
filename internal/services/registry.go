@@ -40,7 +40,44 @@ WantedBy=multi-user.target`,
 			AptPackages: []string{"deluged", "deluge-web"},
 			ConfigDir: "${DATA_DIR}/deluge", User: "deluge",
 			PostInstallCmds: []string{
+				// Auth file for deluged daemon RPC (deluge-web connects to deluged with these)
 				`echo "${VELOUR_USER}:${VELOUR_PASS}:10" > /opt/velour/deluge/auth && chown deluge:deluge /opt/velour/deluge/auth`,
+				// Set deluge-web UI password in web.conf using python3 (Deluge requires Python)
+				`python3 -c "
+import hashlib, json, os
+salt = os.urandom(16).hex()
+pwd_hash = hashlib.sha1((salt + '${VELOUR_PASS}').encode('utf-8')).hexdigest()
+conf_path = '/opt/velour/deluge/web.conf'
+conf = {}
+if os.path.exists(conf_path):
+    try:
+        with open(conf_path) as f:
+            conf = json.load(f)
+    except:
+        pass
+conf['pwd_sha1'] = pwd_hash
+conf['pwd_salt'] = salt
+with open(conf_path, 'w') as f:
+    json.dump(conf, f, indent=2)
+os.chown(conf_path, __import__('pwd').getpwnam('deluge').pw_uid, __import__('grp').getgrnam('deluge').gr_gid)
+"`,
+				// Create and enable deluge-web systemd service
+				`cat > /etc/systemd/system/deluge-web.service << 'UNIT'
+[Unit]
+Description=Deluge Web Interface
+After=network-online.target deluged.service
+Requires=deluged.service
+
+[Service]
+Type=simple
+User=deluge
+ExecStart=/usr/bin/deluge-web -d -c /opt/velour/deluge
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload && systemctl enable deluge-web && systemctl start deluge-web`,
 			},
 			ServiceUnit: `[Unit]
 Description=Deluge Bittorrent Client Daemon
