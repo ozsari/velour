@@ -79,6 +79,8 @@ type NativeConfig struct {
 	Port         int      `json:"port,omitempty"`
 	// Dependencies (other native packages)
 	Dependencies []string `json:"dependencies,omitempty"`
+	// Commands to run after install+start (e.g. patch config to bind 0.0.0.0)
+	PostInstallCmds []string `json:"post_install_cmds,omitempty"`
 }
 
 type AptRepo struct {

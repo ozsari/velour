@@ -14,6 +14,7 @@ var Registry = []models.ServiceDefinition{
 			BinaryURL:  "https://github.com/autobrr/autobrr/releases/latest/download/autobrr_linux_${ARCH}.tar.gz",
 			BinaryPath: "/usr/local/bin/autobrr",
 			ConfigDir:  "${DATA_DIR}/autobrr", User: "autobrr",
+			PostInstallCmds: []string{`sed -i 's/host = "127.0.0.1"/host = "0.0.0.0"/' /opt/velour/autobrr/config.toml`},
 			ServiceUnit: `[Unit]
 Description=autobrr
 After=network.target
@@ -72,7 +73,7 @@ After=network.target
 [Service]
 Type=simple
 User=flood
-ExecStart=/usr/bin/flood --rundir /opt/velour/flood --port 3001
+ExecStart=/usr/bin/flood --rundir /opt/velour/flood --port 3001 --host 0.0.0.0
 Restart=on-failure
 
 [Install]
@@ -110,6 +111,7 @@ WantedBy=multi-user.target`,
 			BinaryURL:  "https://github.com/autobrr/qui/releases/latest/download/qui_linux_${ARCH}.tar.gz",
 			BinaryPath: "/usr/local/bin/qui",
 			User: "qui", ConfigDir: "${DATA_DIR}/qui",
+			PostInstallCmds: []string{`sed -i 's/host = "127.0.0.1"/host = "0.0.0.0"/' /opt/velour/qui/config.toml 2>/dev/null; true`},
 			ServiceUnit: `[Unit]
 Description=qui
 After=network.target
@@ -171,6 +173,7 @@ WantedBy=multi-user.target`,
 			Method: "apt", ServiceName: "transmission-daemon", Port: 9091,
 			AptPackages: []string{"transmission-daemon"},
 			User: "debian-transmission",
+			PostInstallCmds: []string{`sed -i 's/"rpc-whitelist-enabled": true/"rpc-whitelist-enabled": false/' /etc/transmission-daemon/settings.json 2>/dev/null; true`},
 		}},
 	{ID: "nzbget", Name: "NZBGet", Description: "Efficient usenet downloader written in C++ for maximum performance.", Icon: "nzbget", Category: "client", Image: "lscr.io/linuxserver/nzbget:latest",
 		InstallTypes: []models.InstallType{models.InstallDocker, models.InstallNative},
@@ -377,7 +380,7 @@ After=network.target
 [Service]
 Type=simple
 User=bazarr
-ExecStart=/opt/bazarr/venv/bin/python3 /opt/bazarr/bazarr.py --config /opt/velour/bazarr
+ExecStart=/opt/bazarr/venv/bin/python3 /opt/bazarr/bazarr.py --config /opt/velour/bazarr --address 0.0.0.0
 Restart=on-failure
 
 [Install]
@@ -417,7 +420,7 @@ After=network.target
 [Service]
 Type=simple
 User=medusa
-ExecStart=/usr/bin/python3 /opt/medusa/SickBeard.py --datadir /opt/velour/medusa
+ExecStart=/usr/bin/python3 /opt/medusa/SickBeard.py --datadir /opt/velour/medusa --host 0.0.0.0
 Restart=on-failure
 
 [Install]
@@ -470,7 +473,7 @@ After=network.target
 [Service]
 Type=simple
 User=sickgear
-ExecStart=/usr/bin/python3 /opt/sickgear/sickgear.py --datadir /opt/velour/sickgear --port 8082
+ExecStart=/usr/bin/python3 /opt/sickgear/sickgear.py --datadir /opt/velour/sickgear --port 8082 --host 0.0.0.0
 Restart=on-failure
 
 [Install]
@@ -497,7 +500,7 @@ After=network.target
 [Service]
 Type=simple
 User=mylar3
-ExecStart=/usr/bin/python3 /opt/mylar3/Mylar.py --datadir /opt/velour/mylar3
+ExecStart=/usr/bin/python3 /opt/mylar3/Mylar.py --datadir /opt/velour/mylar3 --host 0.0.0.0
 Restart=on-failure
 
 [Install]
@@ -538,7 +541,7 @@ After=network.target
 [Service]
 Type=simple
 User=lazylibrarian
-ExecStart=/usr/bin/python3 /opt/lazylibrarian/LazyLibrarian.py --datadir /opt/velour/lazylibrarian
+ExecStart=/usr/bin/python3 /opt/lazylibrarian/LazyLibrarian.py --datadir /opt/velour/lazylibrarian --host 0.0.0.0
 Restart=on-failure
 
 [Install]
@@ -677,7 +680,7 @@ After=network.target
 [Service]
 Type=simple
 User=navidrome
-ExecStart=/usr/local/bin/navidrome --datafolder /opt/velour/navidrome --musicfolder /opt/velour/music
+ExecStart=/usr/local/bin/navidrome --datafolder /opt/velour/navidrome --musicfolder /opt/velour/music --address 0.0.0.0
 Restart=on-failure
 
 [Install]
@@ -731,7 +734,7 @@ After=network.target
 [Service]
 Type=simple
 User=tautulli
-ExecStart=/usr/bin/python3 /opt/tautulli/Tautulli.py --datadir /opt/velour/tautulli
+ExecStart=/usr/bin/python3 /opt/tautulli/Tautulli.py --datadir /opt/velour/tautulli --host 0.0.0.0
 Restart=on-failure
 
 [Install]
@@ -1036,12 +1039,13 @@ systemctl restart apache2`,
 		Volumes: []models.VolumeMapping{{Host: "${DATA_DIR}/syncthing/config", Container: "/config"}, {Host: "${DATA_DIR}/syncthing/data", Container: "/data"}},
 		Env: map[string]string{"TZ": "Europe/Istanbul", "PUID": "1000", "PGID": "1000"},
 		Native: &models.NativeConfig{
-			Method: "apt", ServiceName: "syncthing", Port: 8384,
+			Method: "apt", ServiceName: "syncthing@velour", Port: 8384,
 			AptPackages: []string{"syncthing"},
 			AptRepo: &models.AptRepo{
 				KeyURL:   "https://syncthing.net/release-key.gpg",
 				RepoLine: "deb [signed-by=/usr/share/keyrings/velour-release-key.gpg] https://apt.syncthing.net/ syncthing stable",
 			},
+			PostInstallCmds: []string{`sed -i 's|<address>127.0.0.1:8384</address>|<address>0.0.0.0:8384</address>|' /home/velour/.config/syncthing/config.xml 2>/dev/null; true`},
 		}},
 	{ID: "rclone", Name: "Rclone", Description: "Command-line tool to manage files on cloud storage with web GUI.", Icon: "rclone", Category: "sync", Image: "rclone/rclone:latest",
 		InstallTypes: []models.InstallType{models.InstallDocker, models.InstallNative},
@@ -1169,6 +1173,7 @@ Type=simple
 User=uptimekuma
 WorkingDirectory=/opt/uptime-kuma
 Environment=DATA_DIR=/opt/velour/uptimekuma
+Environment=UPTIME_KUMA_HOST=0.0.0.0
 ExecStart=/usr/bin/node /opt/uptime-kuma/server/server.js
 Restart=on-failure
 
@@ -1367,7 +1372,7 @@ After=network.target
 [Service]
 Type=simple
 User=stash
-ExecStart=/usr/local/bin/stash --port 9999
+ExecStart=/usr/local/bin/stash --port 9999 --host 0.0.0.0
 Environment=STASH_CONFIG_FILE=/opt/velour/stash/config.yml
 Restart=on-failure
 

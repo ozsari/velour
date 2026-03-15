@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/ozsari/velour/internal/models"
 )
@@ -68,14 +70,29 @@ func (nm *NativeManager) Install(ctx context.Context, def *models.ServiceDefinit
 	// Install based on method
 	switch native.Method {
 	case "apt":
-		return nm.installApt(ctx, native)
+		if err := nm.installApt(ctx, native); err != nil {
+			return err
+		}
 	case "binary":
-		return nm.installBinary(ctx, native)
+		if err := nm.installBinary(ctx, native); err != nil {
+			return err
+		}
 	case "script":
-		return nm.installScript(ctx, native)
+		if err := nm.installScript(ctx, native); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("unknown install method: %s", native.Method)
 	}
+
+	// Run post-install commands (e.g. patch config to bind 0.0.0.0)
+	if len(native.PostInstallCmds) > 0 {
+		if err := nm.runPostInstallCmds(ctx, native); err != nil {
+			log.Printf("Warning: post-install commands failed for %s: %v", native.ServiceName, err)
+		}
+	}
+
+	return nil
 }
 
 func (nm *NativeManager) installApt(ctx context.Context, native *models.NativeConfig) error {
@@ -324,6 +341,26 @@ func (nm *NativeManager) Exec(ctx context.Context, cmd []string) (string, error)
 }
 
 // Helper methods
+
+// runPostInstallCmds waits for the service to generate its config, then stops it,
+// runs the post-install commands (e.g. patching bind address), and restarts.
+func (nm *NativeManager) runPostInstallCmds(ctx context.Context, native *models.NativeConfig) error {
+	// Give the service time to create its config files on first start
+	time.Sleep(3 * time.Second)
+
+	// Stop service before patching config
+	nm.systemctl(ctx, "stop", native.ServiceName)
+
+	for _, cmdStr := range native.PostInstallCmds {
+		cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			log.Printf("post-install cmd failed: %s: %s: %v", cmdStr, string(out), err)
+		}
+	}
+
+	// Restart with patched config
+	return nm.systemctl(ctx, "start", native.ServiceName)
+}
 
 func (nm *NativeManager) expandPath(path string) string {
 	return strings.ReplaceAll(path, "${DATA_DIR}", nm.dataDir)
