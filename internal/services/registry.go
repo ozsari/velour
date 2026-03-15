@@ -129,7 +129,23 @@ WantedBy=multi-user.target`,
 			User: "qbittorrent",
 			PostInstallCmds: []string{
 				// Start qBittorrent, login with default creds, set new creds via API
-				`systemctl start qbittorrent-nox && sleep 3 && SID=$(curl -s -c - 'http://localhost:8085/api/v2/auth/login' -d 'username=admin&password=adminadmin' | grep -oP 'SID\s+\K\S+') && curl -s -b "SID=$SID" 'http://localhost:8085/api/v2/app/setPreferences' -d 'json={"web_ui_username":"$VELOUR_USER","web_ui_password":"$VELOUR_PASS"}'; true`,
+				`systemctl start qbittorrent-nox && sleep 3 && python3 -c "
+import urllib.request, urllib.parse, os, http.cookiejar
+user = os.environ.get('VELOUR_USER', '')
+passwd = os.environ.get('VELOUR_PASS', '')
+if not user or not passwd:
+    print('SKIP: no credentials')
+    exit(0)
+cj = http.cookiejar.CookieJar()
+opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+# Login with default creds
+opener.open(urllib.request.Request('http://localhost:8085/api/v2/auth/login', data=b'username=admin&password=adminadmin'))
+# Set new credentials
+import json
+prefs = json.dumps({'web_ui_username': user, 'web_ui_password': passwd})
+opener.open(urllib.request.Request('http://localhost:8085/api/v2/app/setPreferences', data=('json=' + prefs).encode()))
+print('OK: qBittorrent credentials set')
+"`,
 			},
 			ServiceUnit: `[Unit]
 Description=qBittorrent-nox
@@ -1467,7 +1483,8 @@ WantedBy=multi-user.target`,
 
 // testingApps limits which apps are shown during testing. Set to nil to show all.
 var testingApps = map[string]bool{
-	"deluge": true,
+	"deluge":      true,
+	"qbittorrent": true,
 }
 
 func GetRegistry() []models.ServiceDefinition {
