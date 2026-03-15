@@ -121,7 +121,7 @@ export default function Services() {
                     background: 'rgba(51,65,85,0.3)', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer',
                   }}><RotateCcw size={14} /></button>
                   {running && s.web_url && (
-                    <a href={s.web_url} target="_blank" rel="noopener noreferrer" style={{
+                    <a href={s.web_url.replace('localhost', window.location.hostname)} target="_blank" rel="noopener noreferrer" style={{
                       display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8,
                       background: 'rgba(59,130,246,0.1)', color: 'var(--accent-blue-light)', fontSize: 13, textDecoration: 'none',
                     }}><ExternalLink size={14} /> Open</a>

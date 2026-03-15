@@ -231,7 +231,7 @@ export default function Catalog() {
                     <div style={{ display: 'flex', gap: 5 }}>
                       {installed ? (
                         <>
-                          <a href={`http://localhost:${meta.port}`} target="_blank" rel="noreferrer" style={{
+                          <a href={`http://${window.location.hostname}:${meta.port}`} target="_blank" rel="noreferrer" style={{
                             display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6,
                             border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.1)',
                             color: 'var(--accent-blue-light)', fontSize: 11, fontWeight: 600, textDecoration: 'none',
