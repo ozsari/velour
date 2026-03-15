@@ -60,8 +60,19 @@ UNIT
 systemctl daemon-reload && systemctl enable deluge-web`,
 				// Start deluged+deluge-web briefly so deluge-web generates default web.conf
 				`systemctl start deluged && sleep 2 && systemctl start deluge-web && sleep 5 && systemctl stop deluge-web && systemctl stop deluged`,
-				// Patch web.conf with sed — generate salt+hash, replace in existing file
-				`SALT=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 32 | head -n 1) && HASH=$(python3 -c "import hashlib,sys; s=hashlib.sha1(); s.update(sys.argv[1].encode()); s.update(sys.argv[2].encode()); print(s.hexdigest())" "$SALT" "${VELOUR_PASS}") && sed -i "s|\"pwd_salt\": \"[^\"]*\"|\"pwd_salt\": \"$SALT\"|" /opt/velour/deluge/web.conf && sed -i "s|\"pwd_sha1\": \"[^\"]*\"|\"pwd_sha1\": \"$HASH\"|" /opt/velour/deluge/web.conf && sed -i 's|"first_login": true|"first_login": false|' /opt/velour/deluge/web.conf`,
+				// Set web UI password using Deluge's exact hashing method (all in python3, no bash variable issues)
+				`python3 << 'PYEOF'
+import hashlib, os, subprocess
+password = """${VELOUR_PASS}"""
+salt = hashlib.sha1(os.urandom(32)).hexdigest()
+s = hashlib.sha1(salt.encode("utf-8"))
+s.update(password.encode("utf-8"))
+pwd_hash = s.hexdigest()
+conf = "/opt/velour/deluge/web.conf"
+subprocess.run(["sed", "-i", f's|"pwd_salt": "[^"]*"|"pwd_salt": "{salt}"|', conf])
+subprocess.run(["sed", "-i", f's|"pwd_sha1": "[^"]*"|"pwd_sha1": "{pwd_hash}"|', conf])
+subprocess.run(["sed", "-i", 's|"first_login": true|"first_login": false|', conf])
+PYEOF`,
 				// Restart deluge-web with patched config (deluged will be started by main flow)
 				`(sleep 2 && systemctl start deluge-web) &`,
 			},
