@@ -126,7 +126,8 @@ WantedBy=multi-user.target`,
 			AptPackages: []string{"qbittorrent-nox"},
 			User: "qbittorrent",
 			PostInstallCmds: []string{
-				`SID=$(curl -s -c - 'http://localhost:8085/api/v2/auth/login' -d 'username=admin&password=adminadmin' | grep -oP 'SID\s+\K\S+'); curl -s -b "SID=$SID" 'http://localhost:8085/api/v2/app/setPreferences' -d 'json={"web_ui_username":"${VELOUR_USER}","web_ui_password":"${VELOUR_PASS}"}' 2>/dev/null; true`,
+				// Start qBittorrent, login with default creds, set new creds via API
+				`systemctl start qbittorrent-nox && sleep 3 && SID=$(curl -s -c - 'http://localhost:8085/api/v2/auth/login' -d 'username=admin&password=adminadmin' | grep -oP 'SID\s+\K\S+') && curl -s -b "SID=$SID" 'http://localhost:8085/api/v2/app/setPreferences' -d 'json={"web_ui_username":"${VELOUR_USER}","web_ui_password":"${VELOUR_PASS}"}'; true`,
 			},
 			ServiceUnit: `[Unit]
 Description=qBittorrent-nox
@@ -214,10 +215,10 @@ WantedBy=multi-user.target`,
 			AptPackages: []string{"transmission-daemon"},
 			User: "debian-transmission",
 			PostInstallCmds: []string{
-				`sed -i 's/"rpc-whitelist-enabled": true/"rpc-whitelist-enabled": false/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
-				`sed -i 's/"rpc-authentication-required": false/"rpc-authentication-required": true/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
-				`sed -i 's/"rpc-username": ""/"rpc-username": "${VELOUR_USER}"/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
-				`sed -i 's/"rpc-password": ""/"rpc-password": "${VELOUR_PASS}"/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`sed -i 's/"rpc-whitelist-enabled":.*/"rpc-whitelist-enabled": false,/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`sed -i 's/"rpc-authentication-required":.*/"rpc-authentication-required": true,/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`sed -i 's/"rpc-username":.*/"rpc-username": "${VELOUR_USER}",/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`sed -i 's/"rpc-password":.*/"rpc-password": "${VELOUR_PASS}",/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
 			},
 		}},
 	{ID: "nzbget", Name: "NZBGet", Description: "Efficient usenet downloader written in C++ for maximum performance.", Icon: "nzbget", Category: "client", Image: "lscr.io/linuxserver/nzbget:latest",
