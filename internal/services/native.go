@@ -2,12 +2,14 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -107,6 +109,12 @@ func (nm *NativeManager) installBinary(ctx context.Context, native *models.Nativ
 	binPath := native.BinaryPath
 	if binPath == "" {
 		binPath = "/usr/local/bin/" + native.ServiceName
+	}
+
+	// If URL uses latest/download pattern, resolve via GitHub API to find versioned asset
+	url, err := nm.resolveGitHubURL(url)
+	if err != nil {
+		return fmt.Errorf("failed to resolve download URL: %w", err)
 	}
 
 	// Download binary
@@ -319,6 +327,66 @@ func (nm *NativeManager) Exec(ctx context.Context, cmd []string) (string, error)
 
 func (nm *NativeManager) expandPath(path string) string {
 	return strings.ReplaceAll(path, "${DATA_DIR}", nm.dataDir)
+}
+
+// resolveGitHubURL resolves GitHub latest/download URLs to actual versioned asset URLs.
+// Many projects use versioned filenames (e.g. autobrr_1.74.0_linux_x86_64.tar.gz),
+// so latest/download/autobrr_linux_x86_64.tar.gz returns 404.
+// This method uses the GitHub API to find the matching asset.
+func (nm *NativeManager) resolveGitHubURL(url string) (string, error) {
+	re := regexp.MustCompile(`^https://github\.com/([^/]+/[^/]+)/releases/latest/download/(.+)$`)
+	matches := re.FindStringSubmatch(url)
+	if matches == nil {
+		return url, nil // not a GitHub latest URL, use as-is
+	}
+
+	repo := matches[1]
+	filename := matches[2]
+
+	// Try direct URL first (works for projects with stable filenames)
+	resp, err := http.Head(url)
+	if err == nil && resp.StatusCode == 200 {
+		return url, nil
+	}
+
+	// Fetch latest release assets from GitHub API
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
+	resp, err = http.Get(apiURL)
+	if err != nil {
+		return url, nil // fallback to original URL
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return url, nil
+	}
+
+	var release struct {
+		Assets []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return url, nil
+	}
+
+	// Strip version-agnostic parts from filename to build a match pattern
+	// e.g. "autobrr_linux_x86_64.tar.gz" should match "autobrr_1.74.0_linux_x86_64.tar.gz"
+	parts := strings.SplitN(filename, "_", 2) // ["autobrr", "linux_x86_64.tar.gz"]
+	if len(parts) < 2 {
+		return url, nil
+	}
+	prefix := parts[0] + "_"
+	suffix := "_" + parts[1]
+
+	for _, asset := range release.Assets {
+		if strings.HasPrefix(asset.Name, prefix) && strings.HasSuffix(asset.Name, suffix) {
+			return asset.BrowserDownloadURL, nil
+		}
+	}
+
+	return url, nil // no match found, try original
 }
 
 func (nm *NativeManager) expandArch(url string) string {
