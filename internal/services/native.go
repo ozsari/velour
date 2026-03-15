@@ -19,11 +19,18 @@ import (
 )
 
 type NativeManager struct {
-	dataDir string
+	dataDir     string
+	appUsername string
+	appPassword string
 }
 
 func NewNativeManager(dataDir string) *NativeManager {
 	return &NativeManager{dataDir: dataDir}
+}
+
+func (nm *NativeManager) SetCredentials(username, password string) {
+	nm.appUsername = username
+	nm.appPassword = password
 }
 
 func (nm *NativeManager) Install(ctx context.Context, def *models.ServiceDefinition) error {
@@ -352,6 +359,9 @@ func (nm *NativeManager) runPostInstallCmds(ctx context.Context, native *models.
 	nm.systemctl(ctx, "stop", native.ServiceName)
 
 	for _, cmdStr := range native.PostInstallCmds {
+		// Expand credential placeholders
+		cmdStr = strings.ReplaceAll(cmdStr, "${VELOUR_USER}", nm.appUsername)
+		cmdStr = strings.ReplaceAll(cmdStr, "${VELOUR_PASS}", nm.appPassword)
 		cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			log.Printf("post-install cmd failed: %s: %s: %v", cmdStr, string(out), err)

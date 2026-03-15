@@ -17,6 +17,17 @@ type Config struct {
 	DBPath      string `json:"db_path"`
 	JWTSecret   string `json:"jwt_secret"`
 	InstallMode string `json:"install_mode"` // "docker" or "native"
+	AppUsername  string `json:"app_username,omitempty"`
+	AppPassword  string `json:"app_password,omitempty"`
+}
+
+func (c *Config) Save() error {
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	configPath := filepath.Join(c.DataDir, "config.json")
+	return os.WriteFile(configPath, data, 0600)
 }
 
 func defaultConfig() *Config {

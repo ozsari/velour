@@ -81,6 +81,8 @@ type NativeConfig struct {
 	Dependencies []string `json:"dependencies,omitempty"`
 	// Commands to run after install+start (e.g. patch config to bind 0.0.0.0)
 	PostInstallCmds []string `json:"post_install_cmds,omitempty"`
+	// Default credentials or setup note shown to user after install
+	SetupNote string `json:"setup_note,omitempty"`
 }
 
 type AptRepo struct {

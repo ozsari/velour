@@ -39,6 +39,9 @@ WantedBy=multi-user.target`,
 			Method: "apt", ServiceName: "deluged", Port: 8112,
 			AptPackages: []string{"deluged", "deluge-web"},
 			ConfigDir: "${DATA_DIR}/deluge", User: "deluge",
+			PostInstallCmds: []string{
+				`echo "${VELOUR_USER}:${VELOUR_PASS}:10" > /opt/velour/deluge/auth && chown deluge:deluge /opt/velour/deluge/auth`,
+			},
 			ServiceUnit: `[Unit]
 Description=Deluge Bittorrent Client Daemon
 After=network-online.target
@@ -88,6 +91,9 @@ WantedBy=multi-user.target`,
 			Method: "apt", ServiceName: "qbittorrent-nox", Port: 8085,
 			AptPackages: []string{"qbittorrent-nox"},
 			User: "qbittorrent",
+			PostInstallCmds: []string{
+				`SID=$(curl -s -c - 'http://localhost:8085/api/v2/auth/login' -d 'username=admin&password=adminadmin' | grep -oP 'SID\s+\K\S+'); curl -s -b "SID=$SID" 'http://localhost:8085/api/v2/app/setPreferences' -d 'json={"web_ui_username":"${VELOUR_USER}","web_ui_password":"${VELOUR_PASS}"}' 2>/dev/null; true`,
+			},
 			ServiceUnit: `[Unit]
 Description=qBittorrent-nox
 After=network.target
@@ -173,7 +179,12 @@ WantedBy=multi-user.target`,
 			Method: "apt", ServiceName: "transmission-daemon", Port: 9091,
 			AptPackages: []string{"transmission-daemon"},
 			User: "debian-transmission",
-			PostInstallCmds: []string{`sed -i 's/"rpc-whitelist-enabled": true/"rpc-whitelist-enabled": false/' /etc/transmission-daemon/settings.json 2>/dev/null; true`},
+			PostInstallCmds: []string{
+				`sed -i 's/"rpc-whitelist-enabled": true/"rpc-whitelist-enabled": false/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`sed -i 's/"rpc-authentication-required": false/"rpc-authentication-required": true/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`sed -i 's/"rpc-username": ""/"rpc-username": "${VELOUR_USER}"/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`sed -i 's/"rpc-password": ""/"rpc-password": "${VELOUR_PASS}"/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+			},
 		}},
 	{ID: "nzbget", Name: "NZBGet", Description: "Efficient usenet downloader written in C++ for maximum performance.", Icon: "nzbget", Category: "client", Image: "lscr.io/linuxserver/nzbget:latest",
 		InstallTypes: []models.InstallType{models.InstallDocker, models.InstallNative},
@@ -204,6 +215,10 @@ Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target`,
+			PostInstallCmds: []string{
+				`sed -i 's/^ControlUsername=.*/ControlUsername=${VELOUR_USER}/' /opt/velour/nzbget/nzbget.conf 2>/dev/null; true`,
+				`sed -i 's/^ControlPassword=.*/ControlPassword=${VELOUR_PASS}/' /opt/velour/nzbget/nzbget.conf 2>/dev/null; true`,
+			},
 		}},
 	{ID: "sabnzbd", Name: "SABnzbd", Description: "Free, open-source usenet downloader with web-based interface.", Icon: "sabnzbd", Category: "client", Image: "lscr.io/linuxserver/sabnzbd:latest",
 		InstallTypes: []models.InstallType{models.InstallDocker, models.InstallNative},
@@ -289,6 +304,10 @@ WantedBy=multi-user.target`,
 				RepoLine: "deb [signed-by=/usr/share/keyrings/velour-sonarr.gpg] https://apt.sonarr.tv/debian buster main",
 			},
 			User: "sonarr", ConfigDir: "/var/lib/sonarr",
+			PostInstallCmds: []string{
+				`sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /var/lib/sonarr/config.xml 2>/dev/null; true`,
+				`sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>Enabled</AuthenticationRequired>|' /var/lib/sonarr/config.xml 2>/dev/null; true`,
+			},
 		}},
 	{ID: "sonarr2", Name: "Sonarr (2nd)", Description: "Second instance of Sonarr for managing a separate TV library.", Icon: "sonarr", Category: "media", Image: "lscr.io/linuxserver/sonarr:latest",
 		InstallTypes: []models.InstallType{models.InstallDocker, models.InstallNative},
@@ -303,6 +322,10 @@ WantedBy=multi-user.target`,
 				RepoLine: "deb [signed-by=/usr/share/keyrings/velour-sonarr.gpg] https://apt.sonarr.tv/debian buster main",
 			},
 			User: "sonarr", ConfigDir: "/var/lib/sonarr2",
+			PostInstallCmds: []string{
+				`sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /var/lib/sonarr2/config.xml 2>/dev/null; true`,
+				`sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>Enabled</AuthenticationRequired>|' /var/lib/sonarr2/config.xml 2>/dev/null; true`,
+			},
 			ServiceUnit: `[Unit]
 Description=Sonarr (2nd Instance)
 After=network.target
@@ -329,6 +352,10 @@ WantedBy=multi-user.target`,
 				RepoLine: "deb [signed-by=/usr/share/keyrings/velour-sonarr.gpg] https://apt.sonarr.tv/debian buster main",
 			},
 			User: "radarr", ConfigDir: "/var/lib/radarr",
+			PostInstallCmds: []string{
+				`sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /var/lib/radarr/config.xml 2>/dev/null; true`,
+				`sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>Enabled</AuthenticationRequired>|' /var/lib/radarr/config.xml 2>/dev/null; true`,
+			},
 		}},
 	{ID: "radarr2", Name: "Radarr (2nd)", Description: "Second instance of Radarr for managing a separate movie library.", Icon: "radarr", Category: "media", Image: "lscr.io/linuxserver/radarr:latest",
 		InstallTypes: []models.InstallType{models.InstallDocker, models.InstallNative},
@@ -343,6 +370,10 @@ WantedBy=multi-user.target`,
 				RepoLine: "deb [signed-by=/usr/share/keyrings/velour-sonarr.gpg] https://apt.sonarr.tv/debian buster main",
 			},
 			User: "radarr", ConfigDir: "/var/lib/radarr2",
+			PostInstallCmds: []string{
+				`sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /var/lib/radarr2/config.xml 2>/dev/null; true`,
+				`sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>Enabled</AuthenticationRequired>|' /var/lib/radarr2/config.xml 2>/dev/null; true`,
+			},
 			ServiceUnit: `[Unit]
 Description=Radarr (2nd Instance)
 After=network.target
@@ -399,6 +430,10 @@ WantedBy=multi-user.target`,
 				RepoLine: "deb [signed-by=/usr/share/keyrings/velour-sonarr.gpg] https://apt.sonarr.tv/debian buster main",
 			},
 			User: "lidarr", ConfigDir: "/var/lib/lidarr",
+			PostInstallCmds: []string{
+				`sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /var/lib/lidarr/config.xml 2>/dev/null; true`,
+				`sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>Enabled</AuthenticationRequired>|' /var/lib/lidarr/config.xml 2>/dev/null; true`,
+			},
 		}},
 	{ID: "medusa", Name: "Medusa", Description: "Automatic video library manager for TV shows with multi-source support.", Icon: "medusa", Category: "media", Image: "lscr.io/linuxserver/medusa:latest",
 		InstallTypes: []models.InstallType{models.InstallDocker, models.InstallNative},
@@ -826,6 +861,10 @@ WantedBy=multi-user.target`,
 				RepoLine: "deb [signed-by=/usr/share/keyrings/velour-sonarr.gpg] https://apt.sonarr.tv/debian buster main",
 			},
 			User: "prowlarr", ConfigDir: "/var/lib/prowlarr",
+			PostInstallCmds: []string{
+				`sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /var/lib/prowlarr/config.xml 2>/dev/null; true`,
+				`sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>Enabled</AuthenticationRequired>|' /var/lib/prowlarr/config.xml 2>/dev/null; true`,
+			},
 		}},
 	{ID: "jackett", Name: "Jackett", Description: "Proxy server that translates queries from Sonarr/Radarr into tracker-site-specific queries.", Icon: "jackett", Category: "indexer", Image: "lscr.io/linuxserver/jackett:latest",
 		InstallTypes: []models.InstallType{models.InstallDocker, models.InstallNative},
@@ -1095,6 +1134,10 @@ Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target`,
+			PostInstallCmds: []string{
+				`filebrowser users update admin -p "${VELOUR_PASS}" -d /opt/velour/filebrowser/filebrowser.db 2>/dev/null; true`,
+				`filebrowser users update admin --username "${VELOUR_USER}" -d /opt/velour/filebrowser/filebrowser.db 2>/dev/null; true`,
+			},
 		}},
 
 	// ── Network ──
@@ -1205,6 +1248,10 @@ WantedBy=multi-user.target`,
 				RepoLine: "deb [signed-by=/usr/share/keyrings/velour-sonarr.gpg] https://apt.sonarr.tv/debian buster main",
 			},
 			User: "readarr", ConfigDir: "/var/lib/readarr",
+			PostInstallCmds: []string{
+				`sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /var/lib/readarr/config.xml 2>/dev/null; true`,
+				`sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>Enabled</AuthenticationRequired>|' /var/lib/readarr/config.xml 2>/dev/null; true`,
+			},
 		}},
 
 	{ID: "komga", Name: "Komga", Description: "Free and open-source manga, comic and book media server with OPDS support and web reader.", Icon: "komga", Category: "server", Image: "gotson/komga:latest",

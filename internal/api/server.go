@@ -71,6 +71,9 @@ func (s *Server) Start() error {
 
 	// Init Native manager (Linux only)
 	s.native = services.NewNativeManager(s.cfg.DataDir)
+	if s.cfg.AppUsername != "" {
+		s.native.SetCredentials(s.cfg.AppUsername, s.cfg.AppPassword)
+	}
 
 	// Init Network tracker (monthly stats persistence)
 	s.netTracker = monitor.NewNetworkTracker(db)

@@ -105,6 +105,16 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Save credentials for app provisioning (like swizzin)
+	s.cfg.AppUsername = req.Username
+	s.cfg.AppPassword = req.Password
+	if err := s.cfg.Save(); err != nil {
+		log.Printf("Warning: failed to save app credentials: %v", err)
+	}
+	if s.native != nil {
+		s.native.SetCredentials(req.Username, req.Password)
+	}
+
 	jsonResponse(w, http.StatusCreated, map[string]interface{}{
 		"message": "setup completed",
 		"user":    user,
