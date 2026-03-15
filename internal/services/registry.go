@@ -40,9 +40,7 @@ WantedBy=multi-user.target`,
 			AptPackages: []string{"deluged", "deluge-web"},
 			ConfigDir: "${DATA_DIR}/deluge", User: "deluge",
 			PostInstallCmds: []string{
-				// Auth file for deluged daemon RPC
-				`echo "$VELOUR_USER:$VELOUR_PASS:10" > /opt/velour/deluge/auth && chown deluge:deluge /opt/velour/deluge/auth`,
-				// Create deluge-web systemd service
+				// Create and start deluge-web service
 				`cat > /etc/systemd/system/deluge-web.service << 'UNIT'
 [Unit]
 Description=Deluge Web Interface
@@ -57,25 +55,7 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 UNIT
-systemctl daemon-reload && systemctl enable deluge-web`,
-				// Start deluged+deluge-web briefly so deluge-web generates default web.conf
-				`systemctl start deluged && sleep 2 && systemctl start deluge-web && sleep 5 && systemctl stop deluge-web && systemctl stop deluged`,
-				// Set web UI password using Deluge's exact hashing method — reads password from env var
-				`python3 -c "
-import hashlib, os, subprocess
-password = os.environ['VELOUR_PASS']
-salt = hashlib.sha1(os.urandom(32)).hexdigest()
-s = hashlib.sha1(salt.encode('utf-8'))
-s.update(password.encode('utf-8'))
-pwd_hash = s.hexdigest()
-conf = '/opt/velour/deluge/web.conf'
-subprocess.run(['sed', '-i', 's|\"pwd_salt\": \"[^\"]*\"|\"pwd_salt\": \"' + salt + '\"|', conf])
-subprocess.run(['sed', '-i', 's|\"pwd_sha1\": \"[^\"]*\"|\"pwd_sha1\": \"' + pwd_hash + '\"|', conf])
-subprocess.run(['sed', '-i', 's|\"first_login\": true|\"first_login\": false|', conf])
-print(f'Deluge password set: salt={salt[:8]}... hash={pwd_hash[:8]}...')
-"`,
-				// Restart deluge-web with patched config (deluged will be started by main flow)
-				`(sleep 2 && systemctl start deluge-web) &`,
+systemctl daemon-reload && systemctl enable --now deluge-web`,
 			},
 			ServiceUnit: `[Unit]
 Description=Deluge Bittorrent Client Daemon
@@ -1464,14 +1444,21 @@ WantedBy=multi-user.target`,
 		}},
 }
 
+// testingApps limits which apps are shown during testing. Set to nil to show all.
+var testingApps = map[string]bool{
+	"deluge": true,
+}
+
 func GetRegistry() []models.ServiceDefinition {
-	// Ensure all entries have at least Docker as install type
-	result := make([]models.ServiceDefinition, len(Registry))
-	copy(result, Registry)
-	for i := range result {
-		if len(result[i].InstallTypes) == 0 {
-			result[i].InstallTypes = []models.InstallType{models.InstallDocker}
+	result := make([]models.ServiceDefinition, 0, len(Registry))
+	for _, s := range Registry {
+		if testingApps != nil && !testingApps[s.ID] {
+			continue
 		}
+		if len(s.InstallTypes) == 0 {
+			s.InstallTypes = []models.InstallType{models.InstallDocker}
+		}
+		result = append(result, s)
 	}
 	return result
 }

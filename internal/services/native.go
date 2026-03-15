@@ -110,9 +110,21 @@ func (nm *NativeManager) installApt(ctx context.Context, native *models.NativeCo
 		}
 	}
 
-	// Fix any interrupted dpkg state before installing
+	// Fix any interrupted dpkg state and wait for apt lock
 	fix := exec.CommandContext(ctx, "dpkg", "--configure", "-a")
-	fix.Run() // ignore error, best-effort
+	fix.Run()
+	// Wait up to 60s for apt lock to be released
+	for i := 0; i < 12; i++ {
+		if _, err := os.Stat("/var/lib/dpkg/lock-frontend"); err != nil {
+			break
+		}
+		cmd := exec.CommandContext(ctx, "fuser", "/var/lib/dpkg/lock-frontend")
+		if err := cmd.Run(); err != nil {
+			break // no process holding lock
+		}
+		log.Printf("Waiting for apt lock to be released... (%d/12)", i+1)
+		time.Sleep(5 * time.Second)
+	}
 
 	// Install packages
 	for _, pkg := range native.AptPackages {
