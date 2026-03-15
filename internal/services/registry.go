@@ -235,8 +235,27 @@ WantedBy=multi-user.target`,
 			PostInstallCmds: []string{
 				`sed -i 's/"rpc-whitelist-enabled":.*/"rpc-whitelist-enabled": false,/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
 				`sed -i 's/"rpc-authentication-required":.*/"rpc-authentication-required": true,/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
-				`sed -i 's/"rpc-username":.*/"rpc-username": "$VELOUR_USER",/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
-				`sed -i 's/"rpc-password":.*/"rpc-password": "$VELOUR_PASS",/' /etc/transmission-daemon/settings.json 2>/dev/null; true`,
+				`python3 -c "
+import json, os
+user = os.environ.get('VELOUR_USER', '')
+passwd = os.environ.get('VELOUR_PASS', '')
+conf = '/etc/transmission-daemon/settings.json'
+if user and passwd:
+    try:
+        with open(conf) as f:
+            s = json.load(f)
+        s['rpc-authentication-required'] = True
+        s['rpc-whitelist-enabled'] = False
+        s['rpc-username'] = user
+        s['rpc-password'] = passwd
+        with open(conf, 'w') as f:
+            json.dump(s, f, indent=4)
+        print('OK: Transmission credentials set')
+    except Exception as e:
+        print(f'ERR: {e}')
+else:
+    print('SKIP: no credentials')
+"`,
 			},
 		}},
 	{ID: "nzbget", Name: "NZBGet", Description: "Efficient usenet downloader written in C++ for maximum performance.", Icon: "nzbget", Category: "client", Image: "lscr.io/linuxserver/nzbget:latest",
@@ -269,8 +288,25 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target`,
 			PostInstallCmds: []string{
-				`sed -i 's/^ControlUsername=.*/ControlUsername=$VELOUR_USER/' /opt/velour/nzbget/nzbget.conf 2>/dev/null; true`,
-				`sed -i 's/^ControlPassword=.*/ControlPassword=$VELOUR_PASS/' /opt/velour/nzbget/nzbget.conf 2>/dev/null; true`,
+				`python3 -c "
+import os, re
+user = os.environ.get('VELOUR_USER', '')
+passwd = os.environ.get('VELOUR_PASS', '')
+conf = '/opt/velour/nzbget/nzbget.conf'
+if user and passwd:
+    try:
+        with open(conf) as f:
+            txt = f.read()
+        txt = re.sub(r'^ControlUsername=.*', 'ControlUsername=' + user, txt, flags=re.MULTILINE)
+        txt = re.sub(r'^ControlPassword=.*', 'ControlPassword=' + passwd, txt, flags=re.MULTILINE)
+        with open(conf, 'w') as f:
+            f.write(txt)
+        print('OK: NZBGet credentials set')
+    except Exception as e:
+        print(f'ERR: {e}')
+else:
+    print('SKIP: no credentials')
+"`,
 			},
 		}},
 	{ID: "sabnzbd", Name: "SABnzbd", Description: "Free, open-source usenet downloader with web-based interface.", Icon: "sabnzbd", Category: "client", Image: "lscr.io/linuxserver/sabnzbd:latest",
@@ -1188,8 +1224,18 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target`,
 			PostInstallCmds: []string{
-				`filebrowser users update admin -p "$VELOUR_PASS" -d /opt/velour/filebrowser/filebrowser.db 2>/dev/null; true`,
-				`filebrowser users update admin --username "$VELOUR_USER" -d /opt/velour/filebrowser/filebrowser.db 2>/dev/null; true`,
+				`python3 -c "
+import subprocess, os
+user = os.environ.get('VELOUR_USER', '')
+passwd = os.environ.get('VELOUR_PASS', '')
+db = '/opt/velour/filebrowser/filebrowser.db'
+if user and passwd:
+    subprocess.run(['filebrowser', 'users', 'update', 'admin', '-p', passwd, '-d', db])
+    subprocess.run(['filebrowser', 'users', 'update', 'admin', '--username', user, '-d', db])
+    print('OK: File Browser credentials set')
+else:
+    print('SKIP: no credentials')
+"`,
 			},
 		}},
 
@@ -1482,10 +1528,8 @@ WantedBy=multi-user.target`,
 }
 
 // testingApps limits which apps are shown during testing. Set to nil to show all.
-var testingApps = map[string]bool{
-	"deluge":      true,
-	"qbittorrent": true,
-}
+// Set to nil to show all apps
+var testingApps map[string]bool = nil
 
 func GetRegistry() []models.ServiceDefinition {
 	result := make([]models.ServiceDefinition, 0, len(Registry))
