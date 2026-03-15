@@ -58,38 +58,26 @@ Restart=on-failure
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload && systemctl enable deluge-web`,
-				// Start deluged+deluge-web briefly so deluge-web creates its own default web.conf
-				`systemctl start deluged && sleep 2 && systemctl start deluge-web && sleep 4 && systemctl stop deluge-web && systemctl stop deluged`,
-				// Now modify the existing web.conf that deluge-web created (proper Deluge 2.x format)
-				`python3 -c "
-import hashlib, json, os
-password = '${VELOUR_PASS}'
-conf_path = '/opt/velour/deluge/web.conf'
+				// Start deluged+deluge-web briefly so deluge-web generates default configs
+				`systemctl start deluged && sleep 2 && systemctl start deluge-web && sleep 5 && systemctl stop deluge-web && systemctl stop deluged`,
+				// Use Deluge's own Config class to set web password (same as swizzin)
+				`python3 << 'PYEOF'
+import hashlib, os, sys
+sys.path.insert(0, '/usr/lib/python3/dist-packages')
+from deluge.config import Config
+
+password = "${VELOUR_PASS}"
 salt = os.urandom(32).hex()
 s = hashlib.sha1()
 s.update(salt.encode('utf-8'))
 s.update(password.encode('utf-8'))
-pwd_hash = s.hexdigest()
-# Parse Deluge 2.x two-JSON-objects format
-with open(conf_path) as f:
-    content = f.read()
-decoder = json.JSONDecoder()
-content = content.strip()
-header, idx = decoder.raw_decode(content)
-remaining = content[idx:].strip()
-body, _ = decoder.raw_decode(remaining)
-body['pwd_salt'] = salt
-body['pwd_sha1'] = pwd_hash
-body['first_login'] = False
-with open(conf_path, 'w') as f:
-    json.dump(header, f, indent=4, sort_keys=True, ensure_ascii=True)
-    f.write('\n')
-    json.dump(body, f, indent=4, sort_keys=True, ensure_ascii=True)
-import pwd as pw, grp
-uid = pw.getpwnam('deluge').pw_uid
-gid = grp.getgrnam('deluge').gr_gid
-os.chown(conf_path, uid, gid)
-"`,
+
+config = Config("web.conf", config_dir="/opt/velour/deluge")
+config["pwd_sha1"] = s.hexdigest()
+config["pwd_salt"] = salt
+config["first_login"] = False
+config.save()
+PYEOF`,
 				// Restart deluge-web with patched config (deluged will be started by main flow)
 				`(sleep 3 && systemctl start deluge-web) &`,
 			},
