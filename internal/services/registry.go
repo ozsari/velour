@@ -58,28 +58,12 @@ Restart=on-failure
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload && systemctl enable deluge-web`,
-				// Start deluged+deluge-web briefly so deluge-web generates default configs
+				// Start deluged+deluge-web briefly so deluge-web generates default web.conf
 				`systemctl start deluged && sleep 2 && systemctl start deluge-web && sleep 5 && systemctl stop deluge-web && systemctl stop deluged`,
-				// Use Deluge's own Config class to set web password (same as swizzin)
-				`python3 << 'PYEOF'
-import hashlib, os, sys
-sys.path.insert(0, '/usr/lib/python3/dist-packages')
-from deluge.config import Config
-
-password = "${VELOUR_PASS}"
-salt = os.urandom(32).hex()
-s = hashlib.sha1()
-s.update(salt.encode('utf-8'))
-s.update(password.encode('utf-8'))
-
-config = Config("web.conf", config_dir="/opt/velour/deluge")
-config["pwd_sha1"] = s.hexdigest()
-config["pwd_salt"] = salt
-config["first_login"] = False
-config.save()
-PYEOF`,
+				// Patch web.conf with sed — generate salt+hash, replace in existing file
+				`SALT=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 32 | head -n 1) && HASH=$(python3 -c "import hashlib,sys; s=hashlib.sha1(); s.update(sys.argv[1].encode()); s.update(sys.argv[2].encode()); print(s.hexdigest())" "$SALT" "${VELOUR_PASS}") && sed -i "s|\"pwd_salt\": \"[^\"]*\"|\"pwd_salt\": \"$SALT\"|" /opt/velour/deluge/web.conf && sed -i "s|\"pwd_sha1\": \"[^\"]*\"|\"pwd_sha1\": \"$HASH\"|" /opt/velour/deluge/web.conf && sed -i 's|"first_login": true|"first_login": false|' /opt/velour/deluge/web.conf`,
 				// Restart deluge-web with patched config (deluged will be started by main flow)
-				`(sleep 3 && systemctl start deluge-web) &`,
+				`(sleep 2 && systemctl start deluge-web) &`,
 			},
 			ServiceUnit: `[Unit]
 Description=Deluge Bittorrent Client Daemon
