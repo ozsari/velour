@@ -53,7 +53,7 @@ echo -e "     ${CYAN}Better performance, lower overhead, like Swizzin${NC}"
 echo ""
 
 while true; do
-  read -p "$(echo -e ${BOLD}Choice [1/2]: ${NC})" choice
+  read -p "$(echo -e ${BOLD}Choice [1/2]: ${NC})" choice </dev/tty
   case $choice in
     1) INSTALL_MODE="docker"; break;;
     2) INSTALL_MODE="native"; break;;
