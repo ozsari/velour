@@ -43,23 +43,25 @@ echo -e "${GREEN}Arch:${NC} $(uname -m)"
 echo ""
 
 # Select install mode
-echo -e "${BOLD}Select installation mode:${NC}"
-echo ""
-echo -e "  ${BLUE}1)${NC} ${BOLD}Docker${NC}  - Apps run in containers"
-echo -e "     ${CYAN}Easier setup, isolated apps, works on any Linux${NC}"
-echo ""
-echo -e "  ${GREEN}2)${NC} ${BOLD}Native${NC}  - Apps installed directly on system"
-echo -e "     ${CYAN}Better performance, lower overhead, like Swizzin${NC}"
-echo ""
+if [ -z "${INSTALL_MODE:-}" ]; then
+  echo -e "${BOLD}Select installation mode:${NC}"
+  echo ""
+  echo -e "  ${BLUE}1)${NC} ${BOLD}Docker${NC}  - Apps run in containers"
+  echo -e "     ${CYAN}Easier setup, isolated apps, works on any Linux${NC}"
+  echo ""
+  echo -e "  ${GREEN}2)${NC} ${BOLD}Native${NC}  - Apps installed directly on system"
+  echo -e "     ${CYAN}Better performance, lower overhead, like Swizzin${NC}"
+  echo ""
 
-while true; do
-  read -p "$(echo -e ${BOLD}Choice [1/2]: ${NC})" choice </dev/tty
-  case $choice in
-    1) INSTALL_MODE="docker"; break;;
-    2) INSTALL_MODE="native"; break;;
-    *) echo -e "${RED}Please enter 1 or 2${NC}";;
-  esac
-done
+  while true; do
+    read -p "$(echo -e ${BOLD}Choice [1/2]: ${NC})" choice </dev/tty
+    case $choice in
+      1) INSTALL_MODE="docker"; break;;
+      2) INSTALL_MODE="native"; break;;
+      *) echo -e "${RED}Please enter 1 or 2${NC}";;
+    esac
+  done
+fi
 
 echo ""
 echo -e "${GREEN}Selected:${NC} ${BOLD}${INSTALL_MODE}${NC} mode"
