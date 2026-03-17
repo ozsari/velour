@@ -80,14 +80,21 @@ type NativeConfig struct {
 	// Dependencies (other native packages)
 	Dependencies []string `json:"dependencies,omitempty"`
 	// Commands to run after install+start (e.g. patch config to bind 0.0.0.0)
+	// These run while the service is STOPPED (between stop and restart)
 	PostInstallCmds []string `json:"post_install_cmds,omitempty"`
+	// Commands to run after the service is restarted and listening
+	// (e.g. API calls that require the service to be running)
+	PostStartCmds []string `json:"post_start_cmds,omitempty"`
 	// Default credentials or setup note shown to user after install
 	SetupNote string `json:"setup_note,omitempty"`
 }
 
 type AptRepo struct {
-	// GPG key URL
-	KeyURL  string `json:"key_url"`
+	// GPG key URL (download .asc/.gpg key)
+	KeyURL  string `json:"key_url,omitempty"`
+	// GPG key server + key ID (alternative to KeyURL)
+	KeyServer string `json:"key_server,omitempty"`
+	KeyID     string `json:"key_id,omitempty"`
 	// Repo line (e.g. "deb https://apt.sonarr.tv/debian buster main")
 	RepoLine string `json:"repo_line"`
 }

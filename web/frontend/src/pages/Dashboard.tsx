@@ -607,7 +607,7 @@ export default function Dashboard() {
                   {isRunning ? (
                     <>
                       {s.web_url && (
-                        <a href={s.web_url} target="_blank" rel="noreferrer" title="Open" style={{
+                        <a href={s.web_url.replace('localhost', window.location.hostname)} target="_blank" rel="noreferrer" title="Open" style={{
                           padding: '4px 8px', borderRadius: 5, display: 'flex', alignItems: 'center',
                           background: 'rgba(59,130,246,0.08)', color: 'var(--accent-blue-light)', textDecoration: 'none',
                         }}><ExternalLink size={11} /></a>

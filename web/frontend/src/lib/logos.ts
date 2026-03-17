@@ -51,4 +51,10 @@ export const APP_LOGOS: Record<string, string> = {
   znc: '/logos/znc.png',
   uptimekuma: '/logos/uptimekuma.png',
   mariadb: '/logos/mariadb.png',
+  readarr: '/logos/readarr.png',
+  komga: '/logos/komga.png',
+  recyclarr: '/logos/recyclarr.png',
+  requestrr: '/logos/requestrr.png',
+  tdarr: '/logos/tdarr.png',
+  notifiarr: '/logos/notifiarr.png',
 };
